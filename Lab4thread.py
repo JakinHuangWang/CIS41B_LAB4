@@ -6,8 +6,10 @@ import time
 import collections
 import json
 import threading
+from tkinter import filedialog
 import tkinter as tk
 import tkinter.messagebox as tkmb
+import os
 
 with open('states_hash.json', 'r') as infile:
     State_dict = json.load(infile)
@@ -33,29 +35,50 @@ class disWin(tk.Toplevel):
     def __init__(self, master):
         super().__init__(master)
         self.data = {}
+        self.label = tk.Label(master, text='')
+        self.label.grid(row = 3, column = 0)        
         self.LB = tk.Listbox(self, width=50, height=10, selectmode = 'multiple', yscrollcommand = tk.Scrollbar(self).set)
         self.LB.grid(row = 0, column = 0)
-        tk.Button(self, text='OK', command=self.destroy).grid(row=1, column=0)
+        tk.Button(self, text='OK', command=self.browseFile).grid(row=1, column=0)
+        
     def display(self, master, codeLst, nameLst):
+        self.label['text'] = str()
+        self.label.update()
+        time.sleep(5)
         threadLst = []
         for i in range(len(codeLst)):
             print(codeLst[i], nameLst[i])
             t = threading.Thread(target=self.loadFromWeb, args=(codeLst[i],), name=nameLst[i])
             threadLst.append(t)
-        i = 3
-        for t in threadLst: 
+        output = 'Result: '
+        for i in range(len(threadLst)): 
+            t = threadLst[i]
             t.start()
             t.join()
-            tk.Label(master, text='').grid(row=i, column=0)                        
-            tk.Label(master, text=t.getName() + ": " + self.data['total']).grid(row=i, column=0)            
+            output += t.getName() + ": " + self.data['total'] + '\t'
+            self.label['text'] = output
+            self.label.update() 
             for d in self.data['data']:
-                self.LB.insert(tk.END, d['name'] + ' ' + d['designation'])            
-            i += 1
+                self.LB.insert(tk.END, nameLst[i] + ': ' + d['name'] + ' ' + d['designation'])            
+                
     def loadFromWeb(self, StateCode):
         lock = threading.Lock()
         with lock:
             page = requests.get("https://developer.nps.gov/api/v1/parks?stateCode=" + 
                                 StateCode + "&api_key=" + API_key)
             self.data = page.json()
+            
+    def browseFile(self):
+        default_path = os.getcwd()
+        filename = filedialog.askdirectory()
+        try:
+            with open(filename + '/parks.txt', 'w') as outfile:
+                for k, v in self.data.items():
+                    outfile.write(str(v))
+        except FileNotFoundError:
+            with open(default_path + '/parks.txt', 'w') as outfile:
+                for k, v in self.data.items():
+                    outfile.write(str(v))                
+            
 mWin = mainWin()
 mWin.mainloop()
