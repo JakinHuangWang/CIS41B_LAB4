@@ -13,33 +13,27 @@ import tkinter as tk, multiprocessing as mp
 import tkinter.messagebox as tkmb
 from tkinter import filedialog
 
-
-with open('states_hash.json', 'r') as infile:
-    State_dict = json.load(infile)
-    
-codeLst = list(State_dict.keys())
-nameLst = list(State_dict.values())
 API_key = "11hZnAoJ398zWsTjp6HhqCIhlblofgLwSUsB1EJg"
-data = []
 
 def loadFromWeb(StateCode):
-    print(StateCode)
-    page = requests.get('https://developer.nps.gov/api/v1/parks?stateCode=DE&api_key=11hZnAoJ398zWsTjp6HhqCIhlblofgLwSUsB1EJg')
-    print(page.json())    
-
+    page = requests.get('https://developer.nps.gov/api/v1/parks?stateCode='+StateCode+'&api_key='+API_key)
+    return page.json()['data']
+    
 class mainWin(tk.Tk):
     def __init__(self):
         super().__init__()
+        with open('states_hash.json', 'r') as infile:
+            State_dict = json.load(infile)
+            self.codeLst = list(State_dict.keys())
+            self.nameLst = list(State_dict.values())
         tk.Label(self, text="Select up to 3 States").grid(row = 0, column = 0)
         self.title('Main Window')
         self.LB = tk.Listbox(self, height = 10, selectmode = 'multiple', yscrollcommand = tk.Scrollbar(self).set)
         self.LB.grid(row = 1, column = 0)
-        for v in State_dict.values():
-            self.LB.insert(tk.END, v)
-        tk.Button(self, text='OK', command=lambda:tkmb.showerror("Input Error", "Has to be between 1 to 3 options selected", parent=self)
-                  if len(self.LB.curselection()) > 3 or len(self.LB.curselection()) < 1 
-                  else disWin(self).display(self, [codeLst[i] for i in self.LB.curselection()],
-                                      [nameLst[i] for i in self.LB.curselection()])).grid(row=2, column=0)
+        self.LB.insert(tk.END, *self.nameLst)
+        tk.Button(self, text='OK', command=lambda:disWin(self).display(self, [self.codeLst[i] for i in self.LB.curselection()],
+                [self.nameLst[i] for i in self.LB.curselection()]) if  1 <= len(self.LB.curselection()) <= 3
+                else  tkmb.showerror("Input Error", "Has to be between 1 to 3 options selected", parent=self)).grid(row=2, column=0)
         
 class disWin(tk.Toplevel):
     def __init__(self, master):
@@ -58,37 +52,32 @@ class disWin(tk.Toplevel):
         self.label['text'] = ''
         self.destroy()
         
-    def display(self, master, codeLst, nameLst):
-        proc = []
-        for i in range(len(codeLst)):
-            p = mp.Process(target=loadFromWeb, args=(codeLst[i], ))
-            proc.append(p)
-            p.start()
-        #pool = mp.Pool(len(codeLst))
-        #pool.map(loadFromWeb, codeLst)
-        #for i in range(len(processLst)):
-            #processLst[i].join()
-            #self.label['text'] = 'Fetching data for ' + str(len(codeLst)) + ' States(s)'
-            #self.label.update() 
-            #for d in data[i]['data']:
-                #self.LB.insert(tk.END, nameLst[i] + ': ' + d['name'] + ' ' + d['designation'])            
+    def display(self, master, codeSelect, nameSelect):
+        self.codeSelect = codeSelect
+        self.nameSelect = nameSelect
+        pool = mp.Pool(len(codeSelect))
+        self.data = pool.map(loadFromWeb, codeSelect)
+        self.label['text'] = 'Fetching data for ' + str(len(codeSelect)) + ' States(s)'
+        self.label.update()
+        print(self.data)
+        for i in range(len(codeSelect)):
+            self.LB.insert(tk.END, *[nameSelect[i] + ': ' + d['fullName'] for d  in self.data[i]])
             
     def browseFile(self):
         filename = filedialog.askdirectory()
         if filename == '':
             return
-        if os.path.isfile(filename + '/parks.txt'):
+        if os.path.isfile(filename + 'parks.txt'):
             tkmb.showinfo("Browse File Notification", "parks.txt already existed and will be overwritten", parent = self)
-            filename += '/parks.txt'
         if  filename == os.getcwd():
             filename = 'parks.txt'
+        else:
+            filename += 'parks.txt'
         try:
             with open(filename, 'w', encoding="utf-8") as outfile:
-                for dic in data:
-                    for d in dic['data']:
-                        outfile.write(d['fullName'] + '; ' + 
-                                      ', '.join([(State_dict[state] if state in State_dict else state) for state in d['states'].split(',')]) 
-                                      + '\n' + d['description'] + '\n\n')
+                for i in range(len(self.data)):
+                    outfile.writelines([dic['fullName'] + '; ' + self.nameSelect[i] 
+                                      + '\n' + dic['description'] + '\n\n' for dic in self.data[i]] )
         except FileNotFoundError:
             raise SystemExit
         self.destroy()
