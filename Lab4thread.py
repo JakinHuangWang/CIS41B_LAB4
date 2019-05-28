@@ -1,9 +1,11 @@
-import urllib.request as ur
+'''
+Lab4thread.py
+Author: Jakin Wang
+Description: Lab4 uses the NPS to create a GUI and utilizing threading 
+that allows the users to view all the parks in a certain state
+'''
 import requests
 from bs4 import BeautifulSoup 
-import re
-import time
-import collections
 import json
 import threading
 from tkinter import filedialog
@@ -11,12 +13,14 @@ import tkinter as tk
 import tkinter.messagebox as tkmb
 import os
 
+#Be reading from states_hash.json we can create two lists of State Names and State Codes
 with open('states_hash.json', 'r') as infile:
     State_dict = json.load(infile)
 codeLst = list(State_dict.keys())
 nameLst = list(State_dict.values())
 API_key = "11hZnAoJ398zWsTjp6HhqCIhlblofgLwSUsB1EJg"
 
+#The Main Window creates a listbox which allows the users to choose 1 - 3 states to view the parks.
 class mainWin(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -29,7 +33,8 @@ class mainWin(tk.Tk):
                   if len(self.LB.curselection()) > 3 or len(self.LB.curselection()) < 1 
                   else disWin(self).display(self, [codeLst[i] for i in self.LB.curselection()],
                                       [nameLst[i] for i in self.LB.curselection()])).grid(row=2, column=0)
-        
+
+#The Display Window displays all the state parks chosen by the user     
 class disWin(tk.Toplevel):
     def __init__(self, master):
         super().__init__(master)
@@ -40,13 +45,19 @@ class disWin(tk.Toplevel):
         self.label = tk.Label(master, text='')
         self.label.grid(row = 3, column = 0)         
         self.protocol("WM_DELETE_WINDOW", self.eraseLabel)
+        self.grab_set()
+        self.focus_set()
+    
+    #clear the label and destroy the display window    
     def eraseLabel(self):
         self.label['text'] = ''
+        self.label.update()
         self.destroy()
+        
+    #Display all the state parks by using threads to scrap the web    
     def display(self, master, codeLst, nameLst):
         threadLst = []
         for i in range(len(codeLst)):
-            print(codeLst[i], nameLst[i])
             t = threading.Thread(target=self.loadFromWeb, args=(codeLst[i],), name=nameLst[i])
             threadLst.append(t)
         output = 'Result: '
@@ -59,14 +70,16 @@ class disWin(tk.Toplevel):
             self.label.update() 
             for d in self.data[i]['data']:
                 self.LB.insert(tk.END, nameLst[i] + ': ' + d['name'] + ' ' + d['designation'])            
-                
+    
+    #Loab data from the web using NPS API           
     def loadFromWeb(self, StateCode):
         lock = threading.Lock()
         with lock:
             page = requests.get("https://developer.nps.gov/api/v1/parks?stateCode=" + 
                                 StateCode + "&api_key=" + API_key)
             self.data.append(page.json())
-            
+    
+    #Allows the users to choose a directory to write the parks.txt        
     def browseFile(self):
         filename = filedialog.askdirectory()
         if filename == '':
@@ -86,6 +99,7 @@ class disWin(tk.Toplevel):
         except FileNotFoundError:
             raise SystemExit
         self.destroy()
-            
-mWin = mainWin()
-mWin.mainloop()
+
+if __name__ == '__main__':            
+    mWin = mainWin()
+    mWin.mainloop()
