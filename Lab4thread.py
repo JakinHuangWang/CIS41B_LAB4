@@ -1,7 +1,7 @@
 '''
 Lab4thread.py
 Author: Jakin Wang
-Description: Lab4 uses the NPS to create a GUI and utilizing threading 
+Description: Lab4 uses the NPS to create a GUI and utilizing threadings
 that allows the users to view all the parks in a certain state
 '''
 import requests
@@ -34,7 +34,8 @@ class mainWin(tk.Tk):
         tk.Button(self, text='OK', command=lambda:self.fetch([self.codeLst[i] for i in self.LB.curselection()],
                                       [self.nameLst[i] for i in self.LB.curselection()]) if 1 <= len(self.LB.curselection()) <= 3
                                     else tkmb.showerror("Input Error", "Has to be between 1 to 3 options selected", parent=self)).grid(row=2, column=0)
-
+        
+    #The function fetches the data through threads
     def fetch(self, codeSelect, nameSelect):
         self.data.clear()
         threadLst = []
@@ -53,7 +54,7 @@ class mainWin(tk.Tk):
             self.label.update()
         disWin(self).display(self.data)
         
-    #Loab data from the web using NPS API           
+    #Loab data from the web using NPS API into a list of dictionaries          
     def loadFromWeb(self, StateCode, StateName):
         lock = threading.Lock()
         with lock:
@@ -69,34 +70,26 @@ class disWin(tk.Toplevel):
         self.title('Display Window')
         self.LB = tk.Listbox(self, width=50, height=10, selectmode = 'multiple', yscrollcommand = tk.Scrollbar(self).set)
         self.LB.grid(row = 0, column = 0)
-        tk.Button(self, text='OK', command=lambda: self.browseAndWriteFile() if len(self.LB.curselection()) >= 1
+        tk.Button(self, text='OK', command=lambda: self.browseAndWriteFile(master) if len(self.LB.curselection()) >= 1
                     else tkmb.showerror("Error Message", "Please select at least 1 choice")).grid(row=1, column=0)     
         self.protocol("WM_DELETE_WINDOW", lambda:self.eraseLabel(master))
         self.grab_set()
         self.focus_set()
     
-    #clear the label and destroy the display window    
+    #clear the label in the mainWindow and destroy the display window    
     def eraseLabel(self, master):
         master.label['text'] = ''
         master.label.update()
         self.destroy()
         
-    #Display all the state parks by using threads to scrap the web    
+    #Display all the state parks by states selected by the user    
     def display(self, data):
         self.data = data
         for tup in self.data:
             self.LB.insert(tk.END, *[tup[0] + ': ' + d['fullName'] for d in tup[1]['data']])            
-    
-    #Loab data from the web using NPS API           
-    def loadFromWeb(self, StateCode):
-        lock = threading.Lock()
-        with lock:
-            page = requests.get("https://developer.nps.gov/api/v1/parks?stateCode=" + 
-                                StateCode + "&api_key=" + API_key)
-            self.data.append(page.json())
             
     #Allows the users to choose a directory to write the parks.txt        
-    def browseAndWriteFile(self):
+    def browseAndWriteFile(self, master):
         choices = [(self.data[i][0], d) for i in range(len(self.data)) for d in self.data[i][1]['data'] ]
         filename = filedialog.askdirectory()
         if filename == '':
@@ -111,10 +104,10 @@ class disWin(tk.Toplevel):
                 outfile.writelines([choices[num][1]['fullName'] + '; ' + choices[num][0]
                                       + '\n' + choices[num][1]['description'] + '\n\n' 
                                       for num in self.LB.curselection()])
+                self.eraseLabel(master)
         except FileNotFoundError:
             raise SystemExit
-        self.destroy()
-
+        
 if __name__ == '__main__':            
     mWin = mainWin()
     mWin.mainloop()

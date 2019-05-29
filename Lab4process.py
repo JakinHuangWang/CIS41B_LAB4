@@ -11,8 +11,10 @@ import tkinter as tk, multiprocessing as mp
 import tkinter.messagebox as tkmb
 from tkinter import filedialog
 
+#This is my Key for the NPS API
 API_key = "11hZnAoJ398zWsTjp6HhqCIhlblofgLwSUsB1EJg"
 
+#The function load the data from the NPS API and return a dictionary
 def loadFromWeb(StateCode):
     lock = mp.Lock()
     with lock:
@@ -39,12 +41,13 @@ class mainWin(tk.Tk):
                     [self.nameLst[i] for i in self.LB.curselection()]) if 1 <= len(self.LB.curselection()) <= 3
                   else tkmb.showerror("Input Error", "Has to be between 1 to 3 options selected", parent=self)).grid(row=2, column=0)
         
+    #fetch uses processes to fetch data from the web and store the resulting tuple   
     def fetch(self, codeSelect, nameSelect):
         self.label['text'] = 'Fetching data for ' + str(len(codeSelect)) + ' States(s)'
         self.label.update()        
         pool = mp.Pool(len(codeSelect))
         self.data = pool.map(loadFromWeb, codeSelect)
-        self.label['text'] = ''
+        self.label['text'] = 'All data fetched!!!'
         self.label.update()      
         disWin(self).display([(nameSelect[i], dic) for i in range(len(self.data)) for dic in self.data[i]['data']])
         
@@ -56,14 +59,14 @@ class disWin(tk.Toplevel):
         self.title('Display Window')
         self.LB = tk.Listbox(self, width=50, height=10, selectmode = 'multiple', yscrollcommand = tk.Scrollbar(self).set)
         self.LB.grid(row = 0, column = 0)
-        tk.Button(self, text='OK', command=lambda: self.browseAndWriteFile() if len(self.LB.curselection()) >= 1
+        tk.Button(self, text='OK', command=lambda: self.browseAndWriteFile(master) if len(self.LB.curselection()) >= 1
                     else tkmb.showerror("Error Message", "Please select at least 1 choice")).grid(row=1, column=0)     
-        self.protocol("WM_DELETE_WINDOW", lambda:self.eraseLabel(master))
+        self.protocol("WM_DELETE_WINDOW", lambda:self.closeWin(master))
         self.grab_set()
         self.focus_set()
     
     #clear the label and destroy the display window    
-    def eraseLabel(self, master):
+    def closeWin(self, master):
         master.label['text'] = ''
         master.label.update()
         self.destroy()
@@ -74,7 +77,7 @@ class disWin(tk.Toplevel):
         self.LB.insert(tk.END, *[tup[0] + ': ' + tup[1]['fullName'] for tup in self.data])            
     
     #Allows the users to choose a directory to write the parks.txt        
-    def browseAndWriteFile(self):
+    def browseAndWriteFile(self, master):
         choices = [(tup[0], tup[1]['fullName']) for tup in self.data]
         filename = filedialog.askdirectory()
         if filename == '':
@@ -89,10 +92,10 @@ class disWin(tk.Toplevel):
                 outfile.writelines([self.data[num][1]['fullName'] + '; ' + self.data[num][0]
                                       + '\n' + self.data[num][1]['description'] + '\n\n' 
                                       for num in self.LB.curselection()])
+                self.closeWin(master)
         except FileNotFoundError:
             raise SystemExit
-        self.destroy()
-
+        
 if __name__ == '__main__':            
     mWin = mainWin()
     mWin.mainloop()
